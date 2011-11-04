@@ -1,7 +1,6 @@
 #!/usr/bin/env node
-
 /**
- * @license r.js 1.0.0 Copyright (c) 2010-2011, The Dojo Foundation All Rights Reserved.
+ * @license r.js 1.0.1 Copyright (c) 2010-2011, The Dojo Foundation All Rights Reserved.
  * Available via the MIT or new BSD license.
  * see: http://github.com/jrburke/requirejs for details
  */
@@ -22,7 +21,7 @@ var requirejs, require, define;
 
     var fileName, env, fs, vm, path, exec, rhinoContext, dir, nodeRequire,
         nodeDefine, exists, reqMain, loadedOptimizedLib,
-        version = '1.0.0',
+        version = '1.0.1',
         jsSuffixRegExp = /\.js$/,
         commandOption = '',
         //Used by jslib/rhino/args.js
@@ -103,7 +102,7 @@ var requirejs, require, define;
     }
 
     /** vim: et:ts=4:sw=4:sts=4
- * @license RequireJS 1.0.0 Copyright (c) 2010-2011, The Dojo Foundation All Rights Reserved.
+ * @license RequireJS 1.0.1 Copyright (c) 2010-2011, The Dojo Foundation All Rights Reserved.
  * Available via the MIT or new BSD license.
  * see: http://github.com/jrburke/requirejs for details
  */
@@ -115,8 +114,8 @@ var requirejs, require, define;
 
 (function () {
     //Change this version number for each release.
-    var version = "1.0.0",
-        commentRegExp = /(\/\*([\s\S]*?)\*\/|\/\/(.*)$)/mg,
+    var version = "1.0.1",
+        commentRegExp = /(\/\*([\s\S]*?)\*\/|([^:]|^)\/\/(.*)$)/mg,
         cjsRequireRegExp = /require\(\s*["']([^'"\s]+)["']\s*\)/g,
         currDirRegExp = /^\.\//,
         jsSuffixRegExp = /\.js$/,
@@ -6889,11 +6888,9 @@ define('parse', ['uglifyjs/index'], function (uglify) {
 
                     return onMatch("require", null, null, deps);
 
-                } else if ((call[0] === 'name' && call[1] === 'define') ||
-                           (call[0] === 'dot' && call[1][1] === 'require' &&
-                            call[2] === 'def')) {
+                } else if (call[0] === 'name' && call[1] === 'define') {
 
-                    //A define or require.def call
+                    //A define call
                     name = args[0];
                     deps = args[1];
                     //Only allow define calls that match what is expected
@@ -6909,7 +6906,9 @@ define('parse', ['uglifyjs/index'], function (uglify) {
                     if (((name[0] === 'string' || isArrayLiteral(name) ||
                           name[0] === 'function' || isObjectLiteral(name))) &&
                         (!deps || isArrayLiteral(deps) ||
-                         deps[0] === 'function' || isObjectLiteral(deps))) {
+                         deps[0] === 'function' || isObjectLiteral(deps) ||
+                         // allow define(['dep'], factory) pattern
+                         (isArrayLiteral(name) && deps[0] === 'name' && args.length === 2))) {
 
                         //If first arg is a function, could be a commonjs wrapper,
                         //look inside for commonjs dependencies.
@@ -6986,6 +6985,8 @@ define('pragma', ['parse', 'logger'], function (parse, logger) {
         nsWrapRegExp: /\/\*requirejs namespace: true \*\//,
         apiDefRegExp: /var requirejs, require, define;/,
         defineCheckRegExp: /typeof\s+define\s*===\s*["']function["']\s*&&\s*define\s*\.\s*amd/g,
+        defineJQueryRegExp: /typeof\s+define\s*===\s*["']function["']\s*&&\s*define\s*\.\s*amd\s*&&\s*define\s*\.\s*amd\s*\.\s*jQuery/g,
+        defineTernaryRegExp: /typeof\s+define\s*===\s*['"]function["']\s*&&\s*define\s*\.\s*amd\s*\?\s*define/,
 
         removeStrict: function (contents, config) {
             return config.useStrict ? contents : contents.replace(pragma.useStrictRegExp, '');
@@ -6996,7 +6997,18 @@ define('pragma', ['parse', 'logger'], function (parse, logger) {
                 //Namespace require/define calls
                 fileContents = fileContents.replace(pragma.nsRegExp, '$1' + ns + '.$2(');
 
+
+                //Namespace define ternary use:
+                fileContents = fileContents.replace(pragma.defineTernaryRegExp,
+                                                    "typeof " + ns + ".define === 'function' && " + ns + ".define.amd ? " + ns + ".define");
+
+                //Namespace define jquery use:
+                fileContents = fileContents.replace(pragma.defineJQueryRegExp,
+                                                    "typeof " + ns + ".define === 'function' && " + ns + ".define.amd && " + ns + ".define.jQuery");
+
                 //Namespace define checks.
+                //Do this one last, since it is a subset of the more specific
+                //checks above.
                 fileContents = fileContents.replace(pragma.defineCheckRegExp,
                                                     "typeof " + ns + ".define === 'function' && " + ns + ".define.amd");
 
