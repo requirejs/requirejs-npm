@@ -14,6 +14,10 @@
             "url": "https://github.com/jrburke/r.js/blob/master/LICENSE"
         }
     ],
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/jrburke/r.js.git"
+    },
     "main": "./bin/r.js",
     "bin": {
         "r.js": "./bin/r.js"
