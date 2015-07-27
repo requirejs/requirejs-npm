@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * @license r.js 2.1.19 Copyright (c) 2010-2015, The Dojo Foundation All Rights Reserved.
+ * @license r.js 2.1.20 Copyright (c) 2010-2015, The Dojo Foundation All Rights Reserved.
  * Available via the MIT or new BSD license.
  * see: http://github.com/jrburke/requirejs for details
  */
@@ -21,7 +21,7 @@ var requirejs, require, define, xpcUtil;
 (function (console, args, readFileFunc) {
     var fileName, env, fs, vm, path, exec, rhinoContext, dir, nodeRequire,
         nodeDefine, exists, reqMain, loadedOptimizedLib, existsForNode, Cc, Ci,
-        version = '2.1.19',
+        version = '2.1.20',
         jsSuffixRegExp = /\.js$/,
         commandOption = '',
         useLibLoaded = {},
@@ -250,7 +250,7 @@ var requirejs, require, define, xpcUtil;
     }
 
     /** vim: et:ts=4:sw=4:sts=4
- * @license RequireJS 2.1.19 Copyright (c) 2010-2015, The Dojo Foundation All Rights Reserved.
+ * @license RequireJS 2.1.20 Copyright (c) 2010-2015, The Dojo Foundation All Rights Reserved.
  * Available via the MIT or new BSD license.
  * see: http://github.com/jrburke/requirejs for details
  */
@@ -263,7 +263,7 @@ var requirejs, require, define, xpcUtil;
 (function (global) {
     var req, s, head, baseElement, dataMain, src,
         interactiveScript, currentlyAddingScript, mainScript, subPath,
-        version = '2.1.19',
+        version = '2.1.20',
         commentRegExp = /(\/\*([\s\S]*?)\*\/|([^:]|^)\/\/(.*)$)/mg,
         cjsRequireRegExp = /[^.]\s*require\s*\(\s*["']([^'"\s]+)["']\s*\)/g,
         jsSuffixRegExp = /\.js$/,
@@ -272,7 +272,6 @@ var requirejs, require, define, xpcUtil;
         ostring = op.toString,
         hasOwn = op.hasOwnProperty,
         ap = Array.prototype,
-        apsp = ap.splice,
         isBrowser = !!(typeof window !== 'undefined' && typeof navigator !== 'undefined' && window.document),
         isWebWorker = !isBrowser && typeof importScripts !== 'undefined',
         //PS3 indicates loaded and complete, but need to wait for complete
@@ -805,11 +804,13 @@ var requirejs, require, define, xpcUtil;
         function takeGlobalQueue() {
             //Push all the globalDefQueue items into the context's defQueue
             if (globalDefQueue.length) {
-                //Array splice in the values since the context code has a
-                //local var ref to defQueue, so cannot just reassign the one
-                //on context.
-                apsp.apply(defQueue,
-                           [defQueue.length, 0].concat(globalDefQueue));
+                each(globalDefQueue, function(queueItem) {
+                    var id = queueItem[0];
+                    if (typeof id === 'string') {
+                        context.defQueueMap[id] = true;
+                    }
+                    defQueue.push(queueItem);
+                });
                 globalDefQueue = [];
             }
         }
@@ -1096,7 +1097,10 @@ var requirejs, require, define, xpcUtil;
                     factory = this.factory;
 
                 if (!this.inited) {
-                    this.fetch();
+                    // Only fetch if not already in the defQueue.
+                    if (!hasProp(context.defQueueMap, id)) {
+                        this.fetch();
+                    }
                 } else if (this.error) {
                     this.emit('error', this.error);
                 } else if (!this.defining) {
@@ -1495,6 +1499,7 @@ var requirejs, require, define, xpcUtil;
                     callGetModule(args);
                 }
             }
+            context.defQueueMap = {};
         }
 
         context = {
@@ -1504,6 +1509,7 @@ var requirejs, require, define, xpcUtil;
             defined: defined,
             urlFetched: urlFetched,
             defQueue: defQueue,
+            defQueueMap: {},
             Module: Module,
             makeModuleMap: makeModuleMap,
             nextTick: req.nextTick,
@@ -1753,6 +1759,7 @@ var requirejs, require, define, xpcUtil;
                                 defQueue.splice(i, 1);
                             }
                         });
+                        delete context.defQueueMap[id];
 
                         if (mod) {
                             //Hold on to listeners in case the
@@ -1814,6 +1821,7 @@ var requirejs, require, define, xpcUtil;
 
                     callGetModule(args);
                 }
+                context.defQueueMap = {};
 
                 //Do this after the cycle of callGetModule in case the result
                 //of those calls/init calls changes the registry.
@@ -2318,7 +2326,12 @@ var requirejs, require, define, xpcUtil;
         //where the module name is not known until the script onload event
         //occurs. If no context, use the global queue, and get it processed
         //in the onscript load callback.
-        (context ? context.defQueue : globalDefQueue).push([name, deps, callback]);
+        if (context) {
+            context.defQueue.push([name, deps, callback]);
+            context.defQueueMap[name] = true;
+        } else {
+            globalDefQueue.push([name, deps, callback]);
+        }
     };
 
     define.amd = {
@@ -26060,7 +26073,8 @@ define('parse', ['./esprimaAdapter', 'lang'], function (esprima, lang) {
     parse.parseNode = function (node, onMatch, fnExpScope) {
         var name, deps, cjsDeps, arg, factory, exp, refsDefine, bodyNode,
             args = node && node[argPropName],
-            callName = parse.hasRequire(node);
+            callName = parse.hasRequire(node),
+            isUmd = false;
 
         if (callName === 'require' || callName === 'requirejs') {
             //A plain require/requirejs call
@@ -26092,6 +26106,13 @@ define('parse', ['./esprimaAdapter', 'lang'], function (esprima, lang) {
                 //Just the factory, no name or deps
                 factory = name;
                 name = deps = null;
+            } else if (name.type === 'Identifier' && args.length === 1 &&
+                       hasProp(fnExpScope, name.name)) {
+                //define(e) where e is a UMD identifier for the factory
+                //function.
+                isUmd = true;
+                factory = name;
+                name = null;
             } else if (name.type !== 'Literal') {
                  //An object literal, just null out
                 name = deps = factory = null;
@@ -26128,7 +26149,7 @@ define('parse', ['./esprimaAdapter', 'lang'], function (esprima, lang) {
                 if (cjsDeps.length) {
                     deps = cjsDeps;
                 }
-            } else if (deps || factory) {
+            } else if (deps || (factory && !isUmd)) {
                 //Does not match the shape of an AMD call.
                 return;
             }
@@ -26773,6 +26794,8 @@ define('pragma', ['parse', 'logger'], function (parse, logger) {
         defineJQueryRegExp: /typeof\s+define\s*===?\s*["']function["']\s*&&\s*define\s*\.\s*amd\s*&&\s*define\s*\.\s*amd\s*\.\s*jQuery/g,
         defineHasRegExp: /typeof\s+define\s*==(=)?\s*['"]function['"]\s*&&\s*typeof\s+define\.amd\s*==(=)?\s*['"]object['"]\s*&&\s*define\.amd/g,
         defineTernaryRegExp: /typeof\s+define\s*===?\s*['"]function["']\s*&&\s*define\s*\.\s*amd\s*\?\s*define/,
+        defineExistsRegExp: /\s+typeof\s+define\s*!==?\s*['"]undefined["']\s*/,
+        defineExistsAndAmdRegExp: /typeof\s+define\s*!==?\s*['"]undefined["']\s*&&\s*define\s*\.\s*amd\s*/,
         amdefineRegExp: /if\s*\(\s*typeof define\s*\!==\s*'function'\s*\)\s*\{\s*[^\{\}]+amdefine[^\{\}]+\}/g,
 
         removeStrict: function (contents, config) {
@@ -26799,6 +26822,10 @@ define('pragma', ['parse', 'logger'], function (parse, logger) {
                 fileContents = fileContents.replace(pragma.defineHasRegExp,
                                                     "typeof " + ns + ".define === 'function' && typeof " + ns + ".define.amd === 'object' && " + ns + ".define.amd");
 
+                //Namespace async.js define use:
+                fileContents = fileContents.replace(pragma.defineExistsAndAmdRegExp,
+                                                    "typeof " + ns + ".define !== 'undefined' && " + ns + ".define.amd");
+
                 //Namespace define checks.
                 //Do these ones last, since they are a subset of the more specific
                 //checks above.
@@ -26808,6 +26835,8 @@ define('pragma', ['parse', 'logger'], function (parse, logger) {
                                                     "typeof " + ns + ".define === 'function' && " + ns + ".define['amd']");
                 fileContents = fileContents.replace(pragma.defineTypeFirstCheckRegExp,
                                                     "'function' === typeof " + ns + ".define && " + ns + ".define.amd");
+                fileContents = fileContents.replace(pragma.defineExistsRegExp,
+                                                    "typeof " + ns + ".define !== 'undefined'");
 
                 //Check for require.js with the require/define definitions
                 if (pragma.apiDefRegExp.test(fileContents) &&
@@ -26995,6 +27024,7 @@ define('pragma', ['parse', 'logger'], function (parse, logger) {
 
     return pragma;
 });
+
 if(env === 'browser') {
 /**
  * @license Copyright (c) 2010-2014, The Dojo Foundation All Rights Reserved.
