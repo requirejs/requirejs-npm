@@ -11,7 +11,8 @@
     },
     "main": "./bin/r.js",
     "bin": {
-        "r.js": "./bin/r.js"
+        "r.js": "./bin/r.js",
+        "r_js": "./bin/r.js"
     },
     "engines": {
         "node": ">=0.4.0"
