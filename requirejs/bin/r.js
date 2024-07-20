@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * @license r.js 2.3.6 Copyright jQuery Foundation and other contributors.
+ * @license r.js 2.3.7 Copyright jQuery Foundation and other contributors.
  * Released under MIT license, http://github.com/requirejs/r.js/LICENSE
  */
 
@@ -20,7 +20,7 @@ var requirejs, require, define, xpcUtil;
 (function (console, args, readFileFunc) {
     var fileName, env, fs, vm, path, exec, rhinoContext, dir, nodeRequire,
         nodeDefine, exists, reqMain, loadedOptimizedLib, existsForNode, Cc, Ci,
-        version = '2.3.6',
+        version = '2.3.7',
         jsSuffixRegExp = /\.js$/,
         commandOption = '',
         useLibLoaded = {},
@@ -249,7 +249,7 @@ var requirejs, require, define, xpcUtil;
     }
 
     /** vim: et:ts=4:sw=4:sts=4
- * @license RequireJS 2.3.6 Copyright jQuery Foundation and other contributors.
+ * @license RequireJS 2.3.7 Copyright jQuery Foundation and other contributors.
  * Released under MIT license, https://github.com/requirejs/requirejs/blob/master/LICENSE
  */
 //Not using strict: uneven strict support in browsers, #392, and causes
@@ -261,7 +261,7 @@ var requirejs, require, define, xpcUtil;
 (function (global, setTimeout) {
     var req, s, head, baseElement, dataMain, src,
         interactiveScript, currentlyAddingScript, mainScript, subPath,
-        version = '2.3.6',
+        version = '2.3.7',
         commentRegExp = /\/\*[\s\S]*?\*\/|([^:"'=]|^)\/\/.*$/mg,
         cjsRequireRegExp = /[^.]\s*require\s*\(\s*["']([^'"\s]+)["']\s*\)/g,
         jsSuffixRegExp = /\.js$/,
@@ -283,7 +283,8 @@ var requirejs, require, define, xpcUtil;
         contexts = {},
         cfg = {},
         globalDefQueue = [],
-        useInteractive = false;
+        useInteractive = false,
+        disallowedProps = ['__proto__', 'constructor'];
 
     //Could match something like ')//comment', do not lose the prefix to comment.
     function commentReplace(match, singlePrefix) {
@@ -344,7 +345,7 @@ var requirejs, require, define, xpcUtil;
     function eachProp(obj, func) {
         var prop;
         for (prop in obj) {
-            if (hasProp(obj, prop)) {
+            if (hasProp(obj, prop) && disallowedProps.indexOf(prop) == -1) {
                 if (func(obj[prop], prop)) {
                     break;
                 }
